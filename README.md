@@ -98,8 +98,27 @@ go2, потому что monthly: 96%»), и только потом поста�
 | GET | `/plugins/dsh-opencode-go-key-broker/snapshot?force=1` | состояние пула и лог |
 | POST | `/plugins/dsh-opencode-go-key-broker/activate` `{name}` | форс активного ключа |
 | POST | `/plugins/dsh-opencode-go-key-broker/refresh` | опросить usage сейчас |
+| POST | `/plugins/dsh-opencode-go-key-broker/diag` | диагностика клиента (пишется в `$DSH_HOME/opencode-go-key-broker-diag.ndjson`) |
 
 Мутации принимаются только с loopback и с того же origin.
+
+## Разработка
+
+```sh
+# хост-тесты: самодостаточны, но плагину нужны peer-пакеты DSH,
+# поэтому рядом с исходниками должен быть node_modules с ними
+ln -sfn "$HOME/.dsh/profiles/desktop/node_modules" node_modules   # или путь к бандлу приложения
+node test/host.test.mjs          # 14 сценариев брокера
+node test/client-render.test.mjs # 4 блока клиента (React-заглушка, без зависимостей)
+```
+
+Правки исходников **не подхватываются автоматически**: профиль ставит пакет как
+`file:`-зависимость, pnpm кладёт копию (жёсткими ссылками) в
+`node_modules/dsh-opencode-go-key-broker`. После изменения файлов нужно либо
+скопировать их в эту папку, либо повторить `dsh plugin --profile desktop add file:<путь>`.
+Хост-код и `cordis.patch.yml` читаются при старте — изменения политики и хоста
+требуют перезапуска приложения; клиентский бандл отдаётся с диска, ему достаточно
+жёсткого рефреша страницы.
 
 ## Ограничения
 

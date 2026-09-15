@@ -1,0 +1,6 @@
+# dev-удобство: node_modules нужен только для локального запуска тестов
+# (симлинки на @deepseek-ai/* из бандла DSH). Установка плагина в профиль
+# идёт через `dsh plugin --profile desktop add file:<этот каталог>`.
+node_modules/
+*.log
+.DS_Store

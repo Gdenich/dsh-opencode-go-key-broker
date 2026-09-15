@@ -1,0 +1,35 @@
+# Плагин-строка брокера. Профиль подхватывает этот патч автоматически,
+# когда пакет указан в dsh.profile.bundles (см. README).
+#
+# Политика брокера — здесь:
+#   dryRun: false       — боевой режим: брокер реально переключает
+#                         OPENCODE_GO_API_KEY. true — только логировать решения.
+#   thresholds          — с какого процента окно считается «красным» (98%).
+#   warnPercent         — с какого процента показывать «близко».
+#   sticky: true        — сидеть на ключе, пока он не покраснеет.
+#   prefer: first       — кого брать при переключении: first | headroom.
+#   switchOnError: true — ловить QUOTA/INVALID_CREDENTIAL и повторять запрос
+#                         в том же ходу уже с новым ключом.
+#
+# Переключение происходит ТОЛЬКО если в пуле есть «не красный» кандидат
+# (status ok и percent < порога). Если зелёных нет — брокер остаётся на
+# текущем ключе и пишет в журнал no-alternative. Красным считается и ключ
+# с серверным статусом rate-limited, и невалидный (401).
+- insert:
+    - id: opencode-go-key-broker
+      name: 'dsh-opencode-go-key-broker'
+      config:
+        enabled: true
+        dryRun: false
+        refreshMs: 60000
+        timeoutMs: 15000
+        warnPercent: 80
+        thresholds:
+          rolling: 98
+          weekly: 98
+          monthly: 98
+        sticky: true
+        prefer: first
+        switchOnError: true
+        # keyNames: [go1, go2, go3]   # необязательно: иначе пул сканируется
+        #                             # из $DSH_HOME/.credentials.yaml

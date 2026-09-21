@@ -22,7 +22,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install test stubs (devDependencies are file: stubs, no registry access)
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Tag must match the manifest version
         run: |

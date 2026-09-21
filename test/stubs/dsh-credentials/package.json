@@ -1,0 +1,11 @@
+{
+  "name": "@deepseek-ai/dsh-credentials",
+  "version": "0.0.0-stub",
+  "private": true,
+  "description": "Test stub: the host half only imports credentialRef, which is an identity brand at runtime.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

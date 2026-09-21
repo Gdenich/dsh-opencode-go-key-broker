@@ -1,0 +1,11 @@
+{
+  "name": "@deepseek-ai/dsh-home-paths",
+  "version": "0.0.0-stub",
+  "private": true,
+  "description": "Test stub: resolves the harness home the way the host half expects (DSH_HOME or ~/.dsh).",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

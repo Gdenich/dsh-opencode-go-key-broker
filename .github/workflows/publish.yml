@@ -1,0 +1,42 @@
+name: publish
+
+# Релиз — только аннотированным тегом, иначе workflow молча не запустится:
+#   npm version patch -m "Release %s" && git push origin main --follow-tags
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install test stubs (devDependencies are file: stubs, no registry access)
+        run: npm install --no-audit --no-fund
+
+      - name: Tag must match the manifest version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(node -p "require('./package.json').version")"
+          [ "$tag" = "$version" ] || { echo "tag $GITHUB_REF_NAME != $version" >&2; exit 1; }
+
+      - name: Tests must pass on a fresh clone
+        run: npm test
+
+      - name: Tarball carries only the runtime files
+        run: npm publish --dry-run
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

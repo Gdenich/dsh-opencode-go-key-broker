@@ -44,15 +44,36 @@ OPENCODE_GO_KEY_go3: sk-…
 
 ## Установка
 
+Из реестра npm:
+
 ```sh
-# 1. Пакет в профиль (file:-зависимость)
-dsh plugin --profile desktop add file:/Users/noxor/Coding/dsh-stuff/dsh-og-api-brocker
-
-# 2. В $DSH_HOME/profiles/desktop/package.json добавить имя в dsh.profile.bundles:
-#    "dsh-opencode-go-key-broker"
-
-# 3. Перезапустить dsh web (boot manifest собирается на старте)
+dsh plugin --profile desktop add dsh-opencode-go-key-broker
 ```
+
+Из GitHub (без реестра, ставится сразу после публикации репозитория):
+
+```sh
+dsh plugin --profile desktop add github:Gdenich/dsh-opencode-go-key-broker
+```
+
+Локально из исходников (для разработки):
+
+```sh
+dsh plugin --profile desktop add file:/path/to/dsh-opencode-go-key-broker
+```
+
+`dsh plugin add` дописывает пакет в `dsh.profile.bundles` сам — по полю
+`dsh.bundle.patch`. Дальше **перезапусти DSH Desktop**: список плагинов и
+boot manifest читаются при загрузке профиля.
+
+Две ловушки pnpm, о которых стоит знать:
+
+- свежий релиз не ставится сразу (политика минимального возраста релиза) —
+  если нужна именно новая версия, ставь точную: `dsh-opencode-go-key-broker@0.1.1`;
+- `dsh.profile.bundles` в `desktop`-профиле правится только вручную или через
+  CLI: профиль `desktop` управляется приложением, но список `bundles`,
+  разошедшийся с шаблоном поставки, приложение считает пользовательским и не
+  перезаписывает.
 
 ## Настройка
 

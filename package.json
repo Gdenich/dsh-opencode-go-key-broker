@@ -1,41 +1,58 @@
 {
   "name": "dsh-opencode-go-key-broker",
   "version": "0.1.1",
-  "private": true,
-  "description": "DSH plugin: automatic OpenCode Go API-key switching driven by subscription quota (rolling/weekly/monthly), with a Settings tab for pool management and a manual override.",
+  "description": "DSH plugin: OpenCode Go API-key pool with quota-driven automatic switching, a Settings tab and a composer quota badge.",
   "type": "module",
   "main": "./index.js",
   "exports": {
-    ".": "./index.js",
+    ".": {
+      "default": "./index.js"
+    },
     "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
-  },
-  "scripts": {
-    "test": "node test/host.test.mjs"
   },
   "files": [
     "index.js",
     "client.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
+  "scripts": {
+    "test": "node test/host.test.mjs && node test/client-render.test.mjs",
+    "test:host": "node test/host.test.mjs",
+    "test:client": "node test/client-render.test.mjs"
+  },
   "keywords": [
+    "deepseek-harness",
     "dsh",
     "dsh-plugin",
     "opencode-go",
+    "quota",
+    "api-keys",
     "credentials",
-    "quota"
+    "key-rotation"
   ],
   "license": "MIT",
+  "author": "Gostevsky Denis",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gdenich/dsh-opencode-go-key-broker.git"
+  },
+  "homepage": "https://github.com/Gdenich/dsh-opencode-go-key-broker#readme",
+  "bugs": {
+    "url": "https://github.com/Gdenich/dsh-opencode-go-key-broker/issues"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
+      "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-runtime"
-      ],
-      "platform": "web"
+      ]
     }
   },
   "peerDependencies": {
@@ -43,5 +60,9 @@
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-credentials": "*",
     "@deepseek-ai/dsh-home-paths": "*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-credentials": "file:test/stubs/dsh-credentials",
+    "@deepseek-ai/dsh-home-paths": "file:test/stubs/dsh-home-paths"
   }
 }

@@ -391,5 +391,41 @@ console.log('14) боевой режим: пометка активного вы
   check('в журнале marker-sync', snap.body.log.some((l) => l.action === 'marker-sync'), true)
 }
 
+console.log('15) перевыпуск активного ключа под тем же именем обновляет реф маршрута')
+{
+  const w = makeWorld({
+    keys: { OPENCODE_GO_API_KEY: 'sk-old', OPENCODE_GO_KEY_ACTIVE: 'go1', OPENCODE_GO_KEY_go1: 'oc_sk_new' },
+    usage: { oc_sk_new: usageOf(3, 6, 3) },
+  })
+  await settle()
+  check('маршрут получил новый ключ', w.store.get('OPENCODE_GO_API_KEY'), 'oc_sk_new')
+  check('имя активного осталось прежним', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'go1')
+  // Повторная замена уже во время работы хоста.
+  w.store.set('OPENCODE_GO_KEY_go1', 'oc_sk_newer')
+  w.usage.oc_sk_newer = usageOf(4, 7, 4)
+  await http(w.handler('/snapshot'), { url: 'http://127.0.0.1:1/plugins/dsh-opencode-go-key-broker/snapshot?force=1' })
+  check('следующий refresh подхватил перевыпуск', w.store.get('OPENCODE_GO_API_KEY'), 'oc_sk_newer')
+}
+
+console.log('16) dryRun не переносит заменённый ключ в маршрут')
+{
+  const w = makeWorld({
+    keys: { OPENCODE_GO_API_KEY: 'sk-old', OPENCODE_GO_KEY_ACTIVE: 'go1', OPENCODE_GO_KEY_go1: 'oc_sk_new' },
+    usage: { oc_sk_new: usageOf(3, 6, 3) }, dryRun: true,
+  })
+  await settle()
+  check('маршрут не изменён', w.store.get('OPENCODE_GO_API_KEY'), 'sk-old')
+}
+
+console.log('17) сетевой сбой проверки не переносит неизвестный ключ в маршрут')
+{
+  const w = makeWorld({
+    keys: { OPENCODE_GO_API_KEY: 'sk-old', OPENCODE_GO_KEY_ACTIVE: 'go1', OPENCODE_GO_KEY_go1: 'oc_sk_new' },
+    usage: { oc_sk_new: 'network' },
+  })
+  await settle()
+  check('маршрут не изменён', w.store.get('OPENCODE_GO_API_KEY'), 'sk-old')
+}
+
 console.log(failures === 0 ? '\nВСЕ ПРОВЕРКИ ПРОШЛИ' : `\nПРОВАЛЕНО: ${failures}`)
 process.exit(failures === 0 ? 0 : 1)

@@ -337,6 +337,18 @@ export default {
             }
           }
 
+          // Замена значения под тем же именем пула (например, перевыпуск
+          // истёкшего ключа) не меняет marker. Sticky по имени не должен
+          // оставлять старое значение в рефе, который читает модель.
+          // Синхронизируем только проверенный, не красный ключ; dryRun и
+          // общий бюджет записей соблюдаются внутри applyActive().
+          if (current && current.error === null && currentLevel !== 'red') {
+            const main = await ctx.credentials.resolve(credentialRef(ACTIVE_REF))
+            if (!main || main.value !== current.value) {
+              await applyActive(current.name, current.value, 'active pool key value changed')
+            }
+          }
+
           // Ручной override: пометку выставили из UI/руками — уважаем её.
           const activeEntry = results.find((k) => k.name === activeName)
           if (activeEntry && activeName !== appliedName && appliedName !== null && currentLevel !== 'red') {

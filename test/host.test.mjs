@@ -427,5 +427,67 @@ console.log('17) сетевой сбой проверки не переноси�
   check('маршрут не изменён', w.store.get('OPENCODE_GO_API_KEY'), 'sk-old')
 }
 
+console.log('18) ключ проходит /usage, но не может звать модели (AUTH) → карантин и переключение')
+{
+  const w = makeWorld({
+    keys: {
+      OPENCODE_GO_API_KEY: 'oc_bad',
+      OPENCODE_GO_KEY_ACTIVE: 'main',
+      OPENCODE_GO_KEY_main: 'oc_bad',
+      OPENCODE_GO_KEY_work: 'oc_good',
+    },
+    // оба «зелёные» по квоте: bad выглядит даже лучше
+    usage: { oc_bad: usageOf(0, 0, 0), oc_good: usageOf(10, 10, 10) },
+  })
+  await settle()
+  check('стартовали на main', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'main')
+  const hook = w.hooks.get('agent/request-error')
+  const action = await hook({ provider: 'opencode-go', failure: { code: 'AUTH', message: '403 permission_error' } }, () => undefined)
+  check('ветка вернула retry', action, { kind: 'retry' })
+  check('переключились на work', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'work')
+  check('реф маршрута = рабочий ключ', w.store.get('OPENCODE_GO_API_KEY'), 'oc_good')
+  const snap = await http(w.handler('/snapshot'))
+  check('main помечен red', snap.body.keys.find((k) => k.name === 'main').level, 'red')
+  check('причина — auth failed', /auth failed/.test(snap.body.keys.find((k) => k.name === 'main').reason), true)
+}
+
+console.log('19) карантин снимается, когда под тем же именем записали новый ключ')
+{
+  const w = makeWorld({
+    keys: {
+      OPENCODE_GO_API_KEY: 'oc_bad',
+      OPENCODE_GO_KEY_ACTIVE: 'main',
+      OPENCODE_GO_KEY_main: 'oc_bad',
+      OPENCODE_GO_KEY_work: 'oc_good',
+    },
+    usage: { oc_bad: usageOf(0, 0, 0), oc_good: usageOf(10, 10, 10) },
+  })
+  await settle()
+  await w.hooks.get('agent/request-error')({ provider: 'opencode-go', failure: { code: 'AUTH' } }, () => undefined)
+  check('после ошибки активен work', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'work')
+
+  w.store.set('OPENCODE_GO_KEY_main', 'oc_fixed')
+  w.usage.oc_fixed = usageOf(1, 1, 1)
+  w.store.set('OPENCODE_GO_KEY_ACTIVE', 'main')
+  await http(w.handler('/snapshot'), { url: 'http://127.0.0.1:1/plugins/dsh-opencode-go-key-broker/snapshot?force=1' })
+  const snap = await http(w.handler('/snapshot'))
+  check('новый ключ не красный', snap.body.keys.find((k) => k.name === 'main').level !== 'red', true)
+  check('реестр маршрута подтянул новый ключ', w.store.get('OPENCODE_GO_API_KEY'), 'oc_fixed')
+}
+
+console.log('20) reactProviders не даёт реагировать на чужого провайдера')
+{
+  const w = makeWorld({
+    keys: { OPENCODE_GO_API_KEY: 'oc_a', OPENCODE_GO_KEY_ACTIVE: 'a', OPENCODE_GO_KEY_a: 'oc_a', OPENCODE_GO_KEY_b: 'oc_b' },
+    usage: { oc_a: usageOf(1, 1, 1), oc_b: usageOf(1, 1, 1) },
+    config: { reactProviders: ['opencode-go'] },
+  })
+  await settle()
+  const action = await w.hooks.get('agent/request-error')({ provider: 'nimfer', failure: { code: 'AUTH' } }, () => 'next')
+  check('вернул next()', action, 'next')
+  check('ключ не сменился', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'a')
+}
+
 console.log(failures === 0 ? '\nВСЕ ПРОВЕРКИ ПРОШЛИ' : `\nПРОВАЛЕНО: ${failures}`)
+
 process.exit(failures === 0 ? 0 : 1)

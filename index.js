@@ -126,6 +126,9 @@ export default {
     const sticky = config.sticky !== false
     const prefer = config.prefer === 'headroom' ? 'headroom' : 'first'
     const switchOnError = config.switchOnError !== false
+    // Ограничить реактивную ветку своими маршрутами: чужой провайдер не должен
+    // Menять ключ OpenCode Go из-за своей ошибки авторизации или квоты.
+    const reactProviders = Array.isArray(config.reactProviders) ? config.reactProviders.map(String) : null
     const redOnStatus = config.redOnStatus !== false
     const warnPercent = config.warnPercent ?? 80
     // Порог «красного» окна. 98% — запас на один-два запроса до жёсткого
@@ -170,6 +173,35 @@ export default {
     let appliedName = null
     const switchTimes = []
 
+    // Ключ может проходить `/v1/usage` и при этом не иметь права звать модели
+    // (OpenCode отвечает 403 permission_error «This API key can't call models»).
+    // Квота такого ключа выглядит здоровой, поэтому без отдельной пометки
+    // брокер считал бы его лучшим кандидатом. Карантин снимается сам по
+    // времени или сразу, если значение под этим именем заменили.
+    const quarantined = new Map()
+    const QUARANTINE_MS = 30 * 60_000
+
+    function quarantine(name, value, reason) {
+      if (typeof name !== 'string') return
+      quarantined.set(name, { until: Date.now() + QUARANTINE_MS, value, reason })
+      note('quarantine', { to: name, reason })
+    }
+
+    function quarantineReason(entry) {
+      if (!entry || typeof entry.name !== 'string') return null
+      const mark = quarantined.get(entry.name)
+      if (mark === undefined) return null
+      if (mark.value !== entry.value) {
+        quarantined.delete(entry.name)
+        return null
+      }
+      if (mark.until <= Date.now()) {
+        quarantined.delete(entry.name)
+        return null
+      }
+      return mark.reason
+    }
+
     function note(action, detail) {
       log.unshift({ at: Date.now(), action, ...detail })
       if (log.length > LOG_LIMIT) log.length = LOG_LIMIT
@@ -211,6 +243,8 @@ export default {
 
     /** Уровень ключа: red — пора уходить; warn — запас кончается; unknown — сеть. */
     function classify(entry) {
+      const quarantinedFor = quarantineReason(entry)
+      if (quarantinedFor !== null) return { level: 'red', reason: `auth failed (${quarantinedFor})`, worst: null }
       if (entry.error === 'unauthorized') return { level: 'red', reason: 'invalid key (401)', worst: null }
       if (entry.error) return { level: 'unknown', reason: entry.error, worst: null }
       const windows = entry.windows || {}
@@ -398,11 +432,14 @@ export default {
       return cache
     }
 
-    // Реактивная ветка: ключ выдохся в бою — переключаем и повторяем запрос.
+    // Реактивная ветка: ключ выдохся или отвергнут в бою — переключаем и
+    // повторяем запрос. AUTH — это 401/403 от провайдера (в том числе
+    // «This API key can't call models»), такой ключ не спасает и квота.
     ctx.on('agent/request-error', async (payload, next) => {
       const code = payload?.failure?.code
       if (!enabled || !switchOnError) return next()
-      if (code !== 'QUOTA' && code !== 'INVALID_CREDENTIAL') return next()
+      if (code !== 'QUOTA' && code !== 'INVALID_CREDENTIAL' && code !== 'AUTH') return next()
+      if (Array.isArray(reactProviders) && reactProviders.length > 0 && payload?.provider !== undefined && !reactProviders.includes(String(payload.provider))) return next()
       if (dryRun) {
         await refresh()
         note('would-switch', { reason: `request error ${code}`, dryRun: true })
@@ -416,6 +453,12 @@ export default {
       // Кто был активным до переоценки: превентивная ветка внутри refresh()
       // могла переключить ключ сама — тогда повтор всё равно нужен.
       const before = cache.keys.find((k) => k.active)?.name ?? null
+      // Ключ, который прошёл проверку квоты, но получил 401/403 на запросе,
+      // помечаем красным до смены значения или истечения карантина.
+      if (before !== null && (code === 'AUTH' || code === 'INVALID_CREDENTIAL')) {
+        const failed = (await resolvePool()).find((k) => k.name === before)
+        if (failed) quarantine(before, failed.value, code)
+      }
       await refresh()
       const after = cache.activeName
       if (after !== null && after !== before) {

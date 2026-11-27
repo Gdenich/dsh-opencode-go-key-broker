@@ -294,11 +294,27 @@ export default {
       return switchTimes.length < SWITCH_BUDGET
     }
 
+    /**
+     * Источник действующего ключа в credentials 0.2.x: `file` — запись
+     * профиля, `env` — переменная окружения. Переменная приоритетнее файла,
+     * поэтому запись ключа при `env` ни на что не влияет: брокер обязан это
+     * распознать и честно сказать в журнале, а не делать вид, что переключил.
+     */
+    async function activeKeySource() {
+      const hit = await ctx.credentials.resolve(credentialRef(ACTIVE_REF))
+      if (!hit) return null
+      return typeof hit.source === 'string' ? hit.source : 'file'
+    }
+
     async function applyActive(name_, value, reason) {
       if (dryRun) {
         note('would-switch', { to: name_, reason, dryRun: true })
         appliedName = name_
         return true
+      }
+      if ((await activeKeySource()) === 'env') {
+        note('env-override', { to: name_, reason: 'OPENCODE_GO_API_KEY comes from the environment; a file write cannot win' })
+        return false
       }
       if (!withinBudget()) {
         note('switch-suppressed', { to: name_, reason, why: 'budget' })
@@ -354,6 +370,7 @@ export default {
               return { name: k.name, value: k.value, error: r.error, windows: r.windows || null }
             }),
           )
+          const keySource = await activeKeySource()
           const activeName = await resolveActiveName(pool)
           const current = results.find((k) => k.name === activeName)
           const currentLevel = current ? classify(current).level : 'unknown'
@@ -405,6 +422,7 @@ export default {
             updatedAt: Date.now(),
             state: results.every((k) => classify(k).level === 'red') ? 'all-red' : 'ok',
             activeName: appliedName ?? activeName,
+            activeSource: keySource,
             keys: results.map((k) => {
               const verdict = classify(k)
               return {
@@ -484,6 +502,7 @@ export default {
       state: cache.state,
       error: cache.error,
       active: cache.activeName,
+      activeSource: cache.activeSource ?? null,
       applied: appliedName,
       enabled,
       dryRun,

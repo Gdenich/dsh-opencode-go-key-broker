@@ -109,6 +109,7 @@ window.__ModuleLoader__.load({
       poolEmptyShort: 'пул пуст',
       updatedShort: 'обновлено',
       keysShort: 'ключей',
+      envWarning: 'Ключ маршрута берётся из переменной окружения (env) — запись в файл на него не влияет, автопереключение не сработает. Уберите OPENCODE_GO_API_KEY из окружения.',
     }
     const en = {
       nav: 'OpenCode Go Keys',
@@ -161,6 +162,7 @@ window.__ModuleLoader__.load({
       poolEmptyShort: 'pool empty',
       updatedShort: 'updated',
       keysShort: 'keys',
+      envWarning: 'The route key comes from the environment (env): file writes cannot override it, so automatic switching will not take effect. Remove OPENCODE_GO_API_KEY from the environment.',
     }
     const t = /^ru/i.test(typeof navigator !== 'undefined' ? navigator.language || '' : '') ? ru : en
 
@@ -193,6 +195,7 @@ window.__ModuleLoader__.load({
 .ogkb-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .ogkb-log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.6;max-height:190px;overflow:auto;opacity:.85}
 .ogkb-err{color:#b91c1c}
+.ogkb-note{font-size:12px;line-height:1.5;padding:6px 0}
 .ogkb-tag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;opacity:.75}
 /* --- бейдж квот в строке композера --- */
 .ogkg-root{position:relative;display:inline-flex;align-items:center}
@@ -401,6 +404,9 @@ window.__ModuleLoader__.load({
               h('span', { className: 'ogkb-muted' }, t.updated + ':'),
               h('span', { className: 'ogkb-tag' }, snap && snap.updatedAt ? new Date(snap.updatedAt).toLocaleTimeString() : '—'),
             ),
+            snap && snap.activeSource === 'env'
+              ? h('div', { className: 'ogkb-note ogkb-err' }, t.envWarning)
+              : null,
             h(
               'div',
               { className: 'ogkb-kv' },

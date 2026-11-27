@@ -60,6 +60,30 @@ OPENCODE_GO_KEY_go3: sk-…
 затирают друг друга. Значения ключей не покидают Host: в браузер уходят только
 имена, маски и проценты.
 
+## Совместимость с DSH
+
+Проверено на DSH 0.2.2 (`dsh-desktop-next` 2.0.22-next, клиент 0.2.2-rc.1):
+
+| Контракт | Что использует плагин | Состояние в 0.2.2 |
+| --- | --- | --- |
+| манифест | `dsh.bundle.patch`, `exports["./client"]`, `dsh.client.platform` | без изменений |
+| загрузчик клиента | `window.__ModuleLoader__.load({id, factory})`, `require("react")` из seed-таблицы | без изменений |
+| слоты | `slots.inject(name, cb)`, `slots.register({name, id, order, label}, component)` | `order` и `label` поддержаны; `priority` появился как более сильный ключ |
+| сервисы клиента | `ctx.remote.credentials.set/unset/describe`, конверт `{ok, error.message}` | совпадает с официальной страницей Models |
+| host credentials | `credentials.resolve(ref)` → `{value, source}` \| `undefined`, `set/unset(ref, value)` | совпадает |
+| события | `agent/request-error` (`failure.code`, `{kind:'retry'}`) | без изменений; коды `QUOTA`, `INVALID_CREDENTIAL`, `AUTH` |
+| веб | `ctx.get('webServer')` + `register({kind:'exact', path, handler})` | без изменений |
+
+Два следствия, учтённых в 0.1.4:
+
+- `dsh.client.inject` в 0.2.x перечисляет пакеты, чьи **модули** требует бандл;
+  `@deepseek-ai/dsh-client-runtime` из 0.1.x больше не существует, и поле убрано
+  (бандлу нужен только `react` из платформенной таблицы).
+- `credentials.resolve()` теперь отдаёт `source`. Если `OPENCODE_GO_API_KEY`
+  пришёл из окружения (`env`), запись в файл не победит переменную: брокер
+  пишет `env-override` в журнал, не переключается, а вкладка Settings
+  показывает предупреждение.
+
 ## Установка
 
 Из реестра npm:
@@ -87,7 +111,7 @@ boot manifest читаются при загрузке профиля.
 Две ловушки pnpm, о которых стоит знать:
 
 - свежий релиз не ставится сразу (политика минимального возраста релиза) —
-  если нужна именно новая версия, ставь точную: `dsh-opencode-go-key-broker@0.1.3`;
+  если нужна именно новая версия, ставь точную: `dsh-opencode-go-key-broker@0.1.4`;
 - `dsh.profile.bundles` в `desktop`-профиле правится только вручную или через
   CLI: профиль `desktop` управляется приложением, но список `bundles`,
   разошедшийся с шаблоном поставки, приложение считает пользовательским и не
@@ -148,7 +172,7 @@ go2, потому что monthly: 96%»), и только потом поста�
 # хост-тесты: самодостаточны, но плагину нужны peer-пакеты DSH,
 # поэтому рядом с исходниками должен быть node_modules с ними
 ln -sfn "$HOME/.dsh/profiles/desktop/node_modules" node_modules   # или путь к бандлу приложения
-node test/host.test.mjs          # 20 сценариев брокера
+node test/host.test.mjs          # 21 сценарий брокера
 node test/client-render.test.mjs # 4 блока клиента (React-заглушка, без зависимостей)
 ```
 

@@ -17,7 +17,7 @@ function check(label, actual, expected) {
 const WINDOW = (percent, status = 'ok', resetsAt = '2026-09-20T00:00:00.000Z') => ({ percent, status, resetsAt })
 const usageOf = (rolling, weekly, monthly) => ({ rolling: WINDOW(rolling), weekly: WINDOW(weekly), monthly: WINDOW(monthly) })
 
-function makeWorld({ keys, usage, dryRun = false, config = {}, layout = 'nested' }) {
+function makeWorld({ keys, usage, dryRun = false, config = {}, layout = 'nested', envRefs = [] }) {
   const store = new Map()
   const hooks = new Map()
   const routes = []
@@ -34,9 +34,12 @@ function makeWorld({ keys, usage, dryRun = false, config = {}, layout = 'nested'
 
   const ctx = {
     credentials: {
+      // Форма dsh-credentials-local 0.2.2: resolve -> {value, source} | undefined
       async resolve(ref) {
         const v = store.get(ref)
-        return v === undefined ? { configured: false, writable: true } : { configured: true, writable: true, value: v }
+        if (v === undefined) return undefined
+        const source = envRefs.includes(ref) ? 'env' : 'file'
+        return { value: v, source }
       },
       async set(ref, value) {
         store.set(ref, value)
@@ -486,6 +489,25 @@ console.log('20) reactProviders не даёт реагировать на чуж
   const action = await w.hooks.get('agent/request-error')({ provider: 'nimfer', failure: { code: 'AUTH' } }, () => 'next')
   check('вернул next()', action, 'next')
   check('ключ не сменился', w.store.get('OPENCODE_GO_KEY_ACTIVE'), 'a')
+}
+
+console.log('21) ключ маршрута приходит из env → переключение не делаем, пишем env-override')
+{
+  const w = makeWorld({
+    keys: {
+      OPENCODE_GO_API_KEY: 'sk-env',
+      OPENCODE_GO_KEY_ACTIVE: 'go1',
+      OPENCODE_GO_KEY_go1: 'sk-GO1',
+      OPENCODE_GO_KEY_go2: 'sk-GO2',
+    },
+    usage: { 'sk-GO1': usageOf(10, 20, 99), 'sk-GO2': usageOf(5, 5, 5) },
+    envRefs: ['OPENCODE_GO_API_KEY'],
+  })
+  await settle()
+  check('реф маршрута не тронут', w.store.get('OPENCODE_GO_API_KEY'), 'sk-env')
+  const snap = await http(w.handler('/snapshot'))
+  check('источник ключа = env', snap.body.activeSource, 'env')
+  check('в журнале env-override', snap.body.log.some((l) => l.action === 'env-override'), true)
 }
 
 console.log(failures === 0 ? '\nВСЕ ПРОВЕРКИ ПРОШЛИ' : `\nПРОВАЛЕНО: ${failures}`)

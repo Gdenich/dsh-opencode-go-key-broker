@@ -31,5 +31,7 @@
         sticky: true
         prefer: first
         switchOnError: true
+        reactProviders:
+          - opencode-go
         # keyNames: [go1, go2, go3]   # необязательно: иначе пул сканируется
         #                             # из $DSH_HOME/.credentials.yaml
